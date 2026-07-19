@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manta SV Explorer - Somatic Structural Variants</title>
+    <meta name="description" content="Visualisez, filtrez et explorez les variants structuraux somatiques de Manta et AnnotSV avec une interface moderne et dynamique.">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="glass-header">
+            <div class="logo">
+                <img src="chu_lille_logo.png" alt="CHU Lille" class="logo-img">
+                <div class="logo-text">
+                    <h1>Manta SV Explorer</h1>
+                    <span class="logo-subtitle">Somatic Structural Variant Analysis</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <!-- Assembly Selector -->
+                <div id="assemblySelectorContainer" style="display: none; align-items: center; gap: 0.5rem; margin-right: 0.75rem;">
+                    <span style="font-size: 0.8rem; color: #8892b0; font-weight: 500; white-space: nowrap;">Version :</span>
+                    <select id="assemblySelect" class="select-input select-sm" style="padding: 0.3rem 0.5rem; font-size: 0.8rem; border-radius: 6px; background: rgba(10, 15, 26, 0.4); color: #fff; border: 1px solid rgba(102, 252, 241, 0.25); cursor: pointer; height: 32px; width: 130px;">
+                        <option value="hg38" selected>hg38 (Défaut)</option>
+                        <option value="hg19">hg19 (LiftOver)</option>
+                    </select>
+                </div>
+                <button id="resetFileBtn" class="btn secondary" style="display: none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span>Charger un autre fichier</span>
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <!-- Landing Page with User Guide -->
+            <div id="landingPage" class="landing-page glass-panel active">
+                <div class="landing-content">
+                    <img src="chu_lille_logo.png" alt="CHU Lille" class="chu-logo">
+                    <h2>Manta SV Explorer</h2>
+                    
+                    <div class="guide-container">
+                        <h3>📖 Guide d'Utilisation &amp; Documentation</h3>
+                        
+                        <div class="guide-section">
+                            <h4>1. Présentation de l'outil</h4>
+                            <p>Ce programme permet de visualiser, filtrer et analyser de manière interactive les sorties de variants structuraux (SV) somatiques générées par l'algorithme <strong>Manta</strong> et annotées avec <strong>AnnotSV</strong>.</p>
+                        </div>
+                        
+                        <div class="guide-section">
+                            <h4>2. Interprétation des données de VAF</h4>
+                            <p>La fréquence allélique de la variante (VAF) est extraite dynamiquement pour chaque échantillon à partir des formats VCF :</p>
+                            <ul>
+                                <li><strong>Format PR:VAF :</strong> Paired-end reads support. Représenté par <code>REF,ALT:VAF</code> (ex: <code>68,1:0.0144</code>).</li>
+                                <li><strong>Format PR:SR:VAF :</strong> Paired-end et Split-reads support. Représenté par <code>PR_REF,PR_ALT:SR_REF,SR_ALT:VAF</code> (ex: <code>191,5:133,2:0.0211</code>).</li>
+                                <li>La VAF est calculée comme : <code>ALT_TOTAL / (REF_TOTAL + ALT_TOTAL)</code>.</li>
+                            </ul>
+                            <p>L'application identifie les colonnes d'échantillons (ex: <em>Control</em> pour le tissu sain et <em>Tumor</em> pour le tissu tumoral) pour comparer leurs VAFs et identifier les variants purement somatiques.</p>
+                        </div>
+
+                        <div class="guide-section">
+                            <h4>3. Modes d'annotation (AnnotSV)</h4>
+                            <ul>
+                                <li><strong>Mode Global (Full) :</strong> Une seule ligne par SV. La colonne gène contient la liste de tous les gènes chevauchés (séparés par des points-virgules).</li>
+                                <li><strong>Mode Détaillé (Split) :</strong> Une ligne par gène chevauché, permettant d'analyser précisément l'impact pour chaque gène (exons touchés, localisation intron/exon, transcript, etc.).</li>
+                            </ul>
+                        </div>
+
+                        <div class="guide-section">
+                            <h4>4. Fonctionnalités de filtrage</h4>
+                            <p>Vous pouvez filtrer vos variants structuraux selon le type de SV (délétion, duplication, inversion, translocation), le chromosome, des seuils de VAF dans le tissu sain ou tumoral, la taille du variant, la classe de pathogénicité ACMG, ou en recherchant un gène spécifique.</p>
+                        </div>
+                    </div>
+
+                    <div class="upload-container">
+                        <div id="dropZone" class="upload-box">
+                            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <h3>Fichier de sortie Manta (.tsv ou .csv)</h3>
+                            <p>Glissez-déposez le fichier TSV annoté ici, ou cliquez sur le bouton ci-dessous.</p>
+                            <input type="file" id="mantaInput" accept=".tsv,.csv,.txt" class="file-input">
+                            <label for="mantaInput" class="btn primary" style="margin-top: 1rem;">Parcourir les fichiers</label>
+                        </div>
+                    </div>
+
+                    <footer class="landing-footer">© CHU de Lille – Tous droits réservés</footer>
+                </div>
+            </div>
+
+            <!-- Results Dashboard Section -->
+            <div id="resultsSection" class="results-section glass-panel">
+                <!-- Statistics Summary Grid -->
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper blue">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="statTotalSVs">0</span>
+                            <span class="stat-label">Total SVs (Uniques)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper red">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        </div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="statPathogenic">0</span>
+                            <span class="stat-label">Pathogènes (Classe 4/5)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper green">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"></path></svg>
+                        </div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="statGeneInvolved">0</span>
+                            <span class="stat-label">SVs avec Gènes</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon-wrapper purple">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        </div>
+                        <div class="stat-details">
+                            <span class="stat-value" id="statSomaticSpecific">0</span>
+                            <span class="stat-label">Somatic-Spécifiques</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Type Breakdown, Pathology Predictor and Quick Info -->
+                <div class="dashboard-row">
+                    <div class="type-chart-card glass-subpanel">
+                        <h3>Distribution des Types de SV</h3>
+                        <div id="typeDistribution" class="type-bar-list">
+                            <!-- Generated by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- New Intelligent Pathology Predictor Panel -->
+                    <div class="pathology-predictor-card glass-subpanel">
+                        <h3>💡 Diagnostic Intelligent (Hémato)</h3>
+                        <div class="pathology-selector-group">
+                            <label for="pathologySelect">Sélectionner une pathologie :</label>
+                            <select id="pathologySelect" class="select-input select-sm" style="width: 100%; margin-top: 0.35rem;">
+                                <option value="">-- Choisir une pathologie --</option>
+                                <option value="LAM">LAM (Leucémie Aiguë Myéloïde)</option>
+                                <option value="LAL_B">LAL-B (Leucémie Aiguë Lymphoblastique B)</option>
+                                <option value="LAL_T">LAL-T (Leucémie Aiguë Lymphoblastique T)</option>
+                                <option value="MYELOME">Myélome Multiple</option>
+                                <option value="LYMPHOME">Lymphomes B (Manteau, Folliculaire, Burkitt...)</option>
+                            </select>
+                        </div>
+                        <div id="pathologyResults" class="pathology-results-container">
+                            <p class="placeholder-text">Sélectionnez une pathologie pour analyser les translocations somatiques.</p>
+                        </div>
+                    </div>
+
+                    <div class="active-filters-info glass-subpanel">
+                        <h3>Filtres Actifs &amp; Résumé</h3>
+                        <div class="active-summary">
+                            <p>Nombre de variants affichés : <strong id="filteredCount">0</strong> / <span id="totalCount">0</span></p>
+                            <div class="filter-pills" id="activeFilterPills">
+                                <!-- Pills for active filters -->
+                            </div>
+                            <button id="clearAllFiltersBtn" class="btn secondary btn-sm" style="margin-top: 1rem; padding: 0.4rem 1rem; font-size: 0.85rem;">Réinitialiser les filtres</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Complex Genomic Signatures Panel -->
+                <div class="dashboard-row" style="margin-top: 1.25rem; margin-bottom: 0.5rem;">
+                    <div class="complex-signatures-card glass-subpanel" style="grid-column: span 3;">
+                        <div class="complex-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                                🧬 Signatures Génomiques Complexes &amp; Diagnostic Clinique
+                            </h3>
+                            <span class="info-badge" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: var(--accent); border: 1px solid rgba(102, 252, 241, 0.15);">
+                                Détection Cytogénétique Automatisée
+                            </span>
+                        </div>
+                        <div class="signatures-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem;">
+                            <!-- Chromothripsis Card -->
+                            <div class="sig-subcard" style="background: rgba(10, 15, 26, 0.3); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column;">
+                                <h4 style="margin-top: 0; color: var(--color-del); display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">
+                                    💥 Chromothripsis (VAF &gt;= 20%)
+                                </h4>
+                                <p style="font-size: 0.82rem; color: #8892b0; margin-bottom: 1rem; line-height: 1.45;">
+                                    Identifie des concentrations anormales de cassures double-brin (>= 6 variants dans 10 Mb) sur un chromosome unique avec VAF >= 20%.
+                                </p>
+                                <div id="chromothripsisResults" class="sig-results-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <p class="placeholder-text">En attente de chargement des données...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Chromoplexy Card -->
+                            <div class="sig-subcard" style="background: rgba(10, 15, 26, 0.3); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column;">
+                                <h4 style="margin-top: 0; color: var(--color-inv); display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">
+                                    ⛓️ Chromoplexy (VAF &gt;= 20%)
+                                </h4>
+                                <p style="font-size: 0.82rem; color: #8892b0; margin-bottom: 1rem; line-height: 1.45;">
+                                    Détecte des réarrangements inter-chromosomiques cycliques chaînés (boucles réciproques de 3+ chromosomes) avec VAF >= 20%.
+                                </p>
+                                <div id="chromoplexyResults" class="sig-results-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <p class="placeholder-text">En attente de chargement des données...</p>
+                                </div>
+                            </div>
+
+                            <!-- TP53 / del(17p) Card -->
+                            <div class="sig-subcard" style="background: rgba(10, 15, 26, 0.3); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column;">
+                                <h4 style="margin-top: 0; color: #ff5e62; display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">
+                                    ⚠️ del(17p) / TP53 (VAF &gt;= 20%)
+                                </h4>
+                                <p style="font-size: 0.82rem; color: #8892b0; margin-bottom: 1rem; line-height: 1.45;">
+                                    Identifie une délétion (DEL) ciblant le locus du gène suppresseur de tumeur TP53 (chr17p13.1) avec une VAF >= 20%.
+                                </p>
+                                <div id="tp53Results" class="sig-results-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <p class="placeholder-text">En attente de chargement des données...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Filters Control Panel -->
+                <div class="filters-panel glass-subpanel">
+                    <div class="filters-grid">
+                        <div class="filter-item">
+                            <label for="svTypeFilter">Type de SV</label>
+                            <select id="svTypeFilter" class="select-input">
+                                <option value="">Tous les types</option>
+                                <option value="DEL">Délétion (DEL)</option>
+                                <option value="DUP">Duplication (DUP)</option>
+                                <option value="INV">Inversion (INV)</option>
+                                <option value="BND">Translocation / Breakend (BND)</option>
+                                <option value="INS">Insertion (INS)</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="chrFilter">Chromosome (chr_start)</label>
+                            <select id="chrFilter" class="select-input">
+                                <option value="">Tous</option>
+                                <!-- Generated dynamically -->
+                            </select>
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="acmgFilter">Classe ACMG</label>
+                            <select id="acmgFilter" class="select-input">
+                                <option value="">Toutes</option>
+                                <option value="5">Classe 5 (Pathogène)</option>
+                                <option value="4">Classe 4 (Prob. Pathogène)</option>
+                                <option value="3">Classe 3 (Signif. Incertaine)</option>
+                                <option value="2">Classe 2 (Prob. Bénin)</option>
+                                <option value="1">Classe 1 (Bénin)</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="geneSearchInput">Gène ciblé</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="geneSearchInput" placeholder="Rechercher un gène (ex: TP53...)" class="search-input">
+                                <div id="geneAutocompleteList" class="autocomplete-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="vafTumorSlider">VAF Tumeur Min : <span id="vafTumorVal" class="highlight-text">0.00</span></label>
+                            <input type="range" id="vafTumorSlider" min="0" max="1" step="0.001" value="0" class="range-slider">
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="vafNormalSlider">VAF Sain Max : <span id="vafNormalVal" class="highlight-text">1.00</span></label>
+                            <input type="range" id="vafNormalSlider" min="0" max="1" step="0.001" value="1" class="range-slider">
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="sizeMinSlider">Taille Min : <span id="sizeMinVal" class="highlight-text">Toutes</span></label>
+                            <input type="range" id="sizeMinSlider" min="0" max="10000000" step="5000" value="0" class="range-slider">
+                        </div>
+
+                        <div class="filter-item">
+                            <label for="textSearchInput">Recherche globale</label>
+                            <input type="text" id="textSearchInput" placeholder="ID, région, mot-clé..." class="search-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Header Actions (Annotation Mode Toggle & Pagination Size) -->
+                <div class="table-controls">
+                    <div class="mode-toggle-group">
+                        <button id="modeFullBtn" class="toggle-btn active" title="Affiche un variant structural par ligne">
+                            Vue Globale (SVs)
+                        </button>
+                        <button id="modeSplitBtn" class="toggle-btn" title="Affiche une ligne par gène impacté pour chaque variant">
+                            Vue Détaillée (Gènes)
+                        </button>
+                    </div>
+
+                    <div class="pagination-size">
+                        <label for="pageSizeSelect">Lignes par page :</label>
+                        <select id="pageSizeSelect" class="select-input select-sm">
+                            <option value="20">20</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                            <option value="200">200</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table Container -->
+                <div class="table-container">
+                    <table id="svTable">
+                        <thead>
+                            <tr id="tableHeaderRow">
+                                <!-- Generated Dynamically based on mode -->
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Rows generated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Footer (Pagination) -->
+                <div class="table-footer">
+                    <div class="pagination-info" id="paginationInfo">
+                        Affichage de 0 à 0 sur 0 variants
+                    </div>
+                    <div class="pagination-controls">
+                        <button id="prevPageBtn" class="btn secondary btn-sm disabled" disabled>&lt; Précédent</button>
+                        <span id="pageNumbers" class="page-numbers">
+                            <!-- Page numbers links -->
+                        </span>
+                        <button id="nextPageBtn" class="btn secondary btn-sm disabled" disabled>Suivant &gt;</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Details Sidebar Drawer -->
+    <div id="detailsDrawer" class="details-drawer">
+        <div class="drawer-header">
+            <h3>Détails du Variant</h3>
+            <button id="closeDrawerBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="drawer-content" id="drawerContent">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loadingMessage">Analyse du fichier manta en cours...</p>
+    </div>
+
+    <script src="liftover_map.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
